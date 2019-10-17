@@ -1,0 +1,305 @@
+#include "math.h"
+#ifndef __SENSOR_CONTROL__
+#define __SENSOR_CONTROL__
+
+#include "Arduino.h"
+#define IR_NUM 8
+//モータPIN番号(ハード依存)
+#define M1a 9
+#define M1b 10
+#define M1P 11
+#define M2a 12
+#define M2b 13
+#define M2P 14
+#define M3a 15
+#define M3b 16
+#define M3P 17
+#define M4a 18
+#define M4b 19
+#define M4P 20
+
+
+int activeSensors;
+int maxPulseWidth;
+int maxSensorNumber;
+int θ;
+int power;
+int power1;
+int power2;
+int power3;
+int power4;
+
+
+// ハードウェア依存の変数
+const uint8_t   SensorPins[IR_NUM] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+const float     unitVectorX[IR_NUM] = { 0.000, 0.500,  1.000,  0.500, 0.000, -0.500, -1.000,  -0.500 };
+const float     unitVectorY[IR_NUM] = { 1.000,  0.500, 0.000, -0.500,  -1.000,  -0.500, 0.000, 0.500 };
+const float     deltaPulseWidth = 2.0;
+
+typedef struct {
+	int activeSensors;      // 反応したセンサの個数
+	int maxPulseWidth;      // 最大のセンサ値
+	int maxSensorNumber;    // 最大の値を観測したセンサの番号
+} sensorInfo_t;
+
+typedef struct {
+	float x;
+	float y;
+} vectorXY_t;
+
+typedef struct {
+	float radius;
+	float theta;
+} vectorRT_t;
+
+void setAllSensorPinsInput(void);
+bool getSensorPin(uint8_t pin);
+sensorInfo_t getAllSensorPulseWidth(float pulseWidth[IR_NUM], uint16_t timeLimit);
+vectorXY_t calcVectorXYFromPulseWidth(float* pulseWidth);
+vectorRT_t calcRTfromXY(vectorXY_t* vectorXY_p);
+
+#endif
+//control.hここまで
+
+void setAllSensorPinsInput(void) {
+	for (int i = 0; i < IR_NUM; ++i) {
+		pinMode(SensorPins[i], INPUT);
+	}
+}
+
+/*
+ デジタル読み込みの高速化のためのポート操作
+ 詳しくは以下を参照
+ http://www.musashinodenpa.com/arduino/ref/index.php?f=0&pos=849
+ digitalRead()で一般化されていないためハードウェア依存の実装
+ */
+bool getSensorPin(uint8_t pin) {
+	switch (pin) {
+	case 0:   return PINB & (1 << 2);
+	case 1:   return PINB & (1 << 1);
+	case 2:   return PIND & (1 << 5);
+	case 3:   return PIND & (1 << 6);
+	case 4:   return PIND & (1 << 7);
+	case 5:   return PINB & (1 << 0);
+	case 6:   return PIND & (1 << 4);
+	case 7:   return PIND & (1 << 2);
+	case 8:   return PIND & (1 << 3);
+	case 9:   return PINC & (1 << 3);
+	case 10:  return PINB & (1 << 4);
+	case 11:  return PINB & (1 << 3);
+	}
+}
+
+sensorInfo_t getAllSensorPulseWidth(float pulseWidth[IR_NUM], uint16_t timeLimit) {
+	// 実験用データを格納する構造体
+	sensorInfo_t sensorInfo;
+
+	// pulseWidth[]は加算計算用変数なので最初に初期化する
+	for (int i = 0; i < IR_NUM; i++) {
+		pulseWidth[i] = 0;
+	}
+
+	// do-whileで時間(833us)を監視しながらセンサの読み込み
+	const unsigned long startTime_us = micros();
+	do {
+		for (int i = 0; i < IR_NUM; i++) {
+			if (getSensorPin(i) == false) {
+				pulseWidth[i] += deltaPulseWidth;
+			}
+		}
+	} while ((micros() - startTime_us) < timeLimit);
+
+	// ベクトル計算のみでセンシングを行うのであれば以下の実装は不要
+	sensorInfo.activeSensors = 0; // ボールに反応しているセンサの個数
+	sensorInfo.maxPulseWidth = 0; // 一番反応の強いセンサのパルス幅
+	sensorInfo.maxSensorNumber = 0; // 一番反応の強いセンサの番号
+	for (int i = 0; i < IR_NUM; i++) {
+		if (pulseWidth[i] > 0) {
+			sensorInfo.activeSensors += 1;
+		}
+		if (pulseWidth[i] > sensorInfo.maxPulseWidth) {
+			sensorInfo.maxPulseWidth = pulseWidth[i];
+			sensorInfo.maxSensorNumber = i;
+		}
+	}
+
+	return sensorInfo;
+}
+
+vectorXY_t calcVectorXYFromPulseWidth(float* pulseWidth) {
+	vectorXY_t rslt = { 0, 0 };
+	for (int i = 0; i < IR_NUM; i++) {
+		rslt.x += pulseWidth[i] * unitVectorX[i];
+		rslt.y += pulseWidth[i] * unitVectorY[i];
+	}
+
+	return rslt;
+}
+
+vectorRT_t calcRTfromXY(vectorXY_t* vectorXY_p) {
+	vectorRT_t rslt;
+	rslt.radius = sqrt(pow(vectorXY_p->x, 2.0) + pow(vectorXY_p->y, 2.0));
+	rslt.theta = atan2(vectorXY_p->x, vectorXY_p->y) / PI * 180.0;
+
+	return rslt;
+}
+//sensol control ここまで
+#ifndef __MOVING_AVERAGE__
+#define __MOVING_AVERAGE__
+
+class MovingAverage {
+private:
+	float* dataArray;
+	uint16_t sizeOfDataArray;
+	uint16_t count;
+public:
+	MovingAverage(uint16_t num_array);
+	float updateData(float value);
+	void reset(void);
+};
+
+MovingAverage::MovingAverage(uint16_t num_array) {
+	dataArray = new float[num_array];
+	sizeOfDataArray = num_array;
+	count = 0;
+}
+
+float MovingAverage::updateData(float value) {
+	count++;
+	if (count >= sizeOfDataArray) count = 0;
+	dataArray[count] = value;
+
+	float rslt = 0;
+	for (int i = 0; i < sizeOfDataArray; ++i) {
+		rslt += dataArray[i];
+	}
+
+	return rslt / sizeOfDataArray;
+}
+
+void MovingAverage::reset(void) {
+	for (int i = 0; i < sizeOfDataArray; ++i) {
+		dataArray[i] = 0;
+	}
+}
+
+#endif
+//moving_average.hここまで
+
+
+// RoboCupJunior IR Ball waveform MODE-A T=833[us]
+// https://www.elekit.co.jp/pdf/RCJ-05%20waveform_j.pdf
+#define T_MODEA 833
+
+MovingAverage smaForRadius(20);
+MovingAverage smaForTheta(20);
+
+unsigned long time_ms = 0;
+
+void setup() {
+	Serial.begin(115200);
+	setAllSensorPinsInput();
+}
+
+void loop() {
+	float           pulseWidth[IR_NUM]; // パルス幅を格納する変数
+	sensorInfo_t    sensorInfo;         // 実験用の測定データ ベクトルのみ使う場合は無視することも可能
+	vectorXY_t      vectorXY;           // 直交座標系のベクトル構造体
+	vectorRT_t      vectorRT;           // 極座標系のベクトル構造体
+	vectorRT_t      vectorRTWithSma;    // 移動平均を適用させた極座標系ベクトル
+
+	sensorInfo = getAllSensorPulseWidth(pulseWidth, T_MODEA);
+	vectorXY = calcVectorXYFromPulseWidth(pulseWidth);
+	vectorRT = calcRTfromXY(&vectorXY);
+
+	vectorRTWithSma.theta = smaForTheta.updateData(vectorRT.theta);
+	vectorRTWithSma.radius = smaForRadius.updateData(vectorRT.radius);
+
+	// 50ms周期でシリアルプリント
+	if (millis() - time_ms > 50) {
+		time_ms = millis();
+
+		serialPrintAllPusleWidth(pulseWidth, &sensorInfo);
+		Serial.print("\t");
+		serialPrintVectorXY(&vectorXY);
+		Serial.print("\t");
+		serialPrintVectorRT(&vectorRTWithSma);
+		Serial.print("\t");
+		Serial.print(millis());
+		Serial.print("\n");
+	}
+}
+
+void serialPrintAllPusleWidth(float* pulseWidth, sensorInfo_t* infop) {
+	for (int i = 0; i < IR_NUM; i++) {
+		Serial.print(pulseWidth[i]);
+		Serial.print("\t");
+	}
+	Serial.print(infop->activeSensors);
+	Serial.print("\t");
+	Serial.print(infop->maxSensorNumber);
+	Serial.print("\t");
+	Serial.print(infop->maxPulseWidth);
+}
+
+void serialPrintVectorXY(vectorXY_t* self) {
+	Serial.print(self->x);
+	Serial.print("\t");
+	Serial.print(self->y);
+}
+
+void serialPrintVectorRT(vectorRT_t* self) {
+	Serial.print(self->radius);
+	Serial.print("\t");
+	Serial.print(self->theta);
+}
+
+void loop() {
+	switch (maxSensorNumber)
+	{
+
+	case 1: (maxSensorNumber == 1);
+		θ = 0;
+		power1 = sin((θ - 45 - 10) * M_PI / 180) * power;
+		power2 = sin((θ - 135 - 10) * M_PI / 180) * power;
+		power3 = sin((θ - 225 - 10) * M_PI / 180) * power;
+		power4 = sin((θ - 270 - 10) * M_PI / 180) * power;
+
+	case 2: (maxSensorNumber == 2);
+		θ = 45;
+
+	case 3: (maxSensorNumber == 3);
+		θ = 90;
+
+	case 4: (maxSensorNumber == 4); {
+		θ = 135;
+	}
+	case 5: (maxSensorNumber == 5);
+		θ = 180;
+
+	case 6: (maxSensorNumber == 6);
+		θ = 225;
+
+	case 7: (maxSensorNumber == 7);
+		θ = 270;
+
+	case 8: (maxSensorNumber == 8);
+		θ = 315;
+
+	}
+
+	if (activeSensors >= 1) {
+		digitalWrite(M1a, LOW);
+		digitalWrite(M1b, HIGH);
+		analogWrite(M1P, power1);
+		digitalWrite(M2a, LOW);
+		digitalWrite(M2b, LOW);
+		analogWrite(M2P, power2);
+		digitalWrite(M3a, HIGH);
+		digitalWrite(M3b, LOW);
+		analogWrite(M3P, power3);
+		digitalWrite(M4a, LOW);
+		digitalWrite(M4b, LOW);
+		analogWrite(M4P, power4);
+	}
+}
