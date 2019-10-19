@@ -1,5 +1,4 @@
 #include "math.h"
-#ifndef __SENSOR_CONTROL__
 #define __SENSOR_CONTROL__
 
 #include "Arduino.h"
@@ -19,12 +18,12 @@
 #define M4P 20
 
 
-int activeSensors;
-int maxPulseWidth;
-int maxSensorNumber;
-int θ;
+int activeSensors;      // 反応したセンサの個数
+int maxPulseWidth;      // 最大のセンサ値
+int maxSensorNumber;    // 最大の値を観測したセンサの番号
+int θ;                 // ボールの角度
 int power;
-int power1;
+int power1;             // 
 int power2;
 int power3;
 int power4;
@@ -58,7 +57,6 @@ sensorInfo_t getAllSensorPulseWidth(float pulseWidth[IR_NUM], uint16_t timeLimit
 vectorXY_t calcVectorXYFromPulseWidth(float* pulseWidth);
 vectorRT_t calcRTfromXY(vectorXY_t* vectorXY_p);
 
-#endif
 //control.hここまで
 
 void setAllSensorPinsInput(void) {
@@ -228,33 +226,7 @@ void loop() {
 		Serial.print(millis());
 		Serial.print("\n");
 	}
-}
 
-void serialPrintAllPusleWidth(float* pulseWidth, sensorInfo_t* infop) {
-	for (int i = 0; i < IR_NUM; i++) {
-		Serial.print(pulseWidth[i]);
-		Serial.print("\t");
-	}
-	Serial.print(infop->activeSensors);
-	Serial.print("\t");
-	Serial.print(infop->maxSensorNumber);
-	Serial.print("\t");
-	Serial.print(infop->maxPulseWidth);
-}
-
-void serialPrintVectorXY(vectorXY_t* self) {
-	Serial.print(self->x);
-	Serial.print("\t");
-	Serial.print(self->y);
-}
-
-void serialPrintVectorRT(vectorRT_t* self) {
-	Serial.print(self->radius);
-	Serial.print("\t");
-	Serial.print(self->theta);
-}
-
-void loop() {
 	switch (maxSensorNumber)
 	{
 
@@ -302,4 +274,31 @@ void loop() {
 		digitalWrite(M4b, LOW);
 		analogWrite(M4P, power4);
 	}
+}
+
+
+
+
+void serialPrintAllPusleWidth(float* pulseWidth, sensorInfo_t* infop) {
+	for (int i = 0; i < IR_NUM; i++) {
+		Serial.print(pulseWidth[i]);
+		Serial.print("\t");
+	}
+	Serial.print(infop->activeSensors);
+	Serial.print("\t");
+	Serial.print(infop->maxSensorNumber);
+	Serial.print("\t");
+	Serial.print(infop->maxPulseWidth);
+}
+
+void serialPrintVectorXY(vectorXY_t* self) {
+	Serial.print(self->x);
+	Serial.print("\t");
+	Serial.print(self->y);
+}
+
+void serialPrintVectorRT(vectorRT_t* self) {
+	Serial.print(self->radius);
+	Serial.print("\t");
+	Serial.print(self->theta);
 }
