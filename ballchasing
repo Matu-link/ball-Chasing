@@ -18,15 +18,21 @@
 #define M4P 20
 
 
-int activeSensors;      // 反応したセンサの個数
-int maxPulseWidth;      // 最大のセンサ値
-int maxSensorNumber;    // 最大の値を観測したセンサの番号
+
 int θ;                 // ボールの角度
 int power;
 int power1;             // 
 int power2;
 int power3;
 int power4;
+int x1a; //モータHIGH or LOW
+int x1b;
+int x2a;
+int x2b;
+int x3a;
+int x3b;
+int x4a;
+int x4b;
 
 
 // ハードウェア依存の変数
@@ -227,54 +233,93 @@ void loop() {
 		Serial.print("\n");
 	}
 
-	switch (maxSensorNumber)
+	if (power1 == 0) {
+		x1a == LOW;
+		x1b == LOW;
+	}
+	else if (power1 > 0 && sensorInfo.maxSensorNumber >= 1, sensorInfo.maxSensorNumber < 3) {
+		x1a == LOW;
+		x1b == HIGH;
+	}
+
+	if (power2 == 0) {
+		x2a == LOW;
+		x2b == LOW;
+	}
+	else if (power2 > 0 && sensorInfo.maxSensorNumber >= 1, sensorInfo.maxSensorNumber <= 3) {
+		x2a == HIGH;
+		x2b == LOW;
+	}
+
+	if (power3 == 0) {
+		x3a == LOW;
+		x3b == LOW;
+	}
+	else if (power3 > 0 && sensorInfo.axSensorNumber >= 1, sensorInfo.maxSensorNumber < 3) {
+		x3a == LOW;
+		x3b == HIGH;
+	}
+
+	if (power4 == 0) {
+		x4a == LOW;
+		x4b == LOW;
+	}
+	else if (power4 > 0 && sensorInfo.maxSensorNumber >= 1, sensorInfo.maxSensorNumber < 3) {
+		x4a == HIGH;
+		x4b == LOW;
+	}
+	
+
+	switch (sensorInfo.maxSensorNumber)
 	{
 
-	case 1: (maxSensorNumber == 1);
+	case 1: (sensorInfo.maxSensorNumber > 1 && sensorInfo.maxSensorNumber < 3);
 		θ = 0;
 		power1 = sin((θ - 45 - 10) * M_PI / 180) * power;
 		power2 = sin((θ - 135 - 10) * M_PI / 180) * power;
 		power3 = sin((θ - 225 - 10) * M_PI / 180) * power;
 		power4 = sin((θ - 270 - 10) * M_PI / 180) * power;
 
-	case 2: (maxSensorNumber == 2);
+
+	case 2: (sensorInfo.maxSensorNumber == 2);
 		θ = 45;
 
-	case 3: (maxSensorNumber == 3);
+	case 3: (sensorInfo.maxSensorNumber == 3);
 		θ = 90;
 
-	case 4: (maxSensorNumber == 4); {
+	case 4: (sensorInfo.maxSensorNumber == 4); {
 		θ = 135;
 	}
-	case 5: (maxSensorNumber == 5);
+	case 5: (sensorInfo.maxSensorNumber == 5);
 		θ = 180;
 
-	case 6: (maxSensorNumber == 6);
+	case 6: (sensorInfo.maxSensorNumber == 6);
 		θ = 225;
 
-	case 7: (maxSensorNumber == 7);
+	case 7: (sensorInfo.maxSensorNumber == 7);
 		θ = 270;
 
-	case 8: (maxSensorNumber == 8);
+	case 8: (sensorInfo.maxSensorNumber == 8);
 		θ = 315;
 
 	}
-
-	if (activeSensors >= 1) {
-		digitalWrite(M1a, LOW);
-		digitalWrite(M1b, HIGH);
-		analogWrite(M1P, power1);
-		digitalWrite(M2a, LOW);
-		digitalWrite(M2b, LOW);
-		analogWrite(M2P, power2);
-		digitalWrite(M3a, HIGH);
-		digitalWrite(M3b, LOW);
-		analogWrite(M3P, power3);
-		digitalWrite(M4a, LOW);
-		digitalWrite(M4b, LOW);
-		analogWrite(M4P, power4);
-	}
+	
+	while (activeSensors >= 1); {
+			digitalWrite(M1a, x1a);
+			digitalWrite(M1b, x1b);
+			analogWrite(M1P, power1);
+			digitalWrite(M2a, x2a);
+			digitalWrite(M2b, x2b);
+			analogWrite(M2P, power2);
+			digitalWrite(M3a, x3a);
+			digitalWrite(M3b, x3b);
+			analogWrite(M3P, power3);
+			digitalWrite(M4a, x4a);
+			digitalWrite(M4b, x4b);
+			analogWrite(M4P, power4);
+		}
 }
+
 
 
 
